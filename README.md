@@ -1,30 +1,25 @@
-# Wollongong Air Quality Data Processor
+# PM2.5 Air Quality Analysis for Wollongong (2022-2025)
 
-A Python script that processes air quality monitoring data from Wollongong, cleaning and transforming the data for analysis.
-
-## Overview
-
-This program loads environmental monitoring data from an Excel file containing air quality measurements from Wollongong. It performs multiple data cleaning and transformation steps to prepare the data for analysis, including:
-
-- Handling metadata rows
-- Cleaning column names
-- Converting data types
-- Detecting and removing invalid values (negative PM2.5 readings)
-- Fixing time format issues (e.g., 24:00 timestamps)
-- Creating a proper datetime index
+This Python program analyzes PM2.5 air quality data from Wollongong, Australia, covering the period from April 9, 2022 to April 10, 2025. The analysis includes time series examination, seasonal decomposition, correlation studies, and year-over-year comparisons.
 
 ## Features
 
-- **Data Cleaning**: Removes metadata and converts columns to appropriate data types
-- **Data Validation**: Detects and handles physically impossible values (negative PM2.5 readings)
-- **Time Normalization**: Fixes time format issues (24:00 → 00:00 the next day)
-- **Basic Analysis**: Provides descriptive statistics of the cleaned dataset
+- Data cleaning and preprocessing
+- Time series visualization (daily and monthly averages)
+- Correlation analysis between meteorological factors and PM2.5
+- Seasonal decomposition (weekly and annual patterns)
+- Monthly distribution analysis
+- Year-over-year comparison
 
 ## Requirements
 
-- Python 3.x
-- pandas
-- openpyxl (for Excel file handling)
+- Python 3.6+
+- Required packages:
+- Pandas
+- Matplotlib
+- Seaborn
+- Statsmodels
+- Numpy
 
 ## Installation
 
@@ -44,106 +39,65 @@ This program loads environmental monitoring data from an Excel file containing a
      ```
 4. Install the required dependencies:
    ```
-   pip install pandas openpyxl
+   pip install pandas openpyxl matplotlib seaborn statsmodels numpy
    ```
 
-## Usage
+## Data Source
 
-1. Place your `Wollongong.xls` file in the same directory as the script
-2. Run the script:
-   ```
-   python main.py
-   ```
+The program expects an Excel file named `Wollongong_09042022_10042025.xlsx` with the following columns:
+- Date (DD/MM/YYYY format)
+- Time (HH:MM format)
+- Temperature (°C)
+- Wind speed (m/s)
+- PM2.5 concentration (µg/m³)
+- Humidity (%)
 
-## Input Data Format
+## Analysis Outputs
 
-The program expects an Excel file with the following characteristics:
-- First row contains metadata (skipped during import)
-- Second row contains headers
-- Data columns include date, time, temperature, wind speed, PM2.5 measurements, and humidity
+### 1. Time Series Trends
+![Daily and Monthly PM2.5 Trends](pm25_time_series.png)
+- Shows the daily and monthly average PM2.5 concentrations over the 3-year period
+- Helps identify long-term trends and seasonal patterns
 
-## Code Explanation
+### 2. Feature Correlations
+![Feature Correlations](feature_correlations_rolling.png)
+- Displays correlation coefficients between PM2.5 and meteorological factors
+- Uses 7-day rolling averages to smooth short-term fluctuations
 
-### Data Loading and Initial Cleaning
+### 3. Weekly Seasonality
+![Weekly Decomposition](seasonal_decomposition_weekly.png)
+- Breaks down the PM2.5 time series into:
+- Observed values
+- Long-term trend
+- Weekly seasonal component
+- Residuals
 
-```python
-# Load the data skipping first row (metadata) and use second row as header
-df = pd.read_excel("Wollongong.xls", skiprows=1, header=0)
-    
-# Clean column names
-df.columns = ['date', 'time', 'temp_c', 'wind_speed_ms', 'pm25_ugm3', 'humidity_pct']
-```
+### 4. Annual Seasonality
+![Annual Decomposition](seasonal_decomposition_annual.png)
+- Shows the annual seasonal pattern using monthly averaged data
+- Reveals yearly cycles in PM2.5 concentrations
 
-This section loads the Excel file while skipping the metadata row, then renames columns to standardized names.
+### 5. Monthly Distribution
+![Monthly Boxplots](monthly_boxplots.png)
+- Displays the distribution of PM2.5 values for each month
+- Highlights seasonal variations and outliers
 
-### Data Type Conversion and Validation
+### 6. Year-over-Year Comparison
+![Year Comparison](year_over_year_comparison.png)
+- Compares PM2.5 levels across different years
+- Uses 7-day rolling averages for smoother comparison
 
-```python
-# Convert numeric columns
-numeric_cols = ['temp_c', 'wind_speed_ms', 'pm25_ugm3', 'humidity_pct']
-df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-```
+## Key Findings
 
-Converts appropriate columns to numeric data types, using `coerce` to handle non-numeric values.
+1. **Data Quality**:
+ - The program automatically handles negative PM2.5 values (removing them from analysis)
+ - Fixes datetime conversion issues (especially for midnight values)
 
-### Negative PM2.5 Value Detection and Removal
+2. **Temporal Patterns**:
+ - PM2.5 shows clear seasonal variation
+ - Weekly patterns may reflect human activity cycles
+ - Annual patterns may relate to weather conditions
 
-```python
-# Check for negative PM2.5 values (physically impossible)
-negative_pm25 = df[df['pm25_ugm3'] < 0]
+3. **Relationships**:
+ - The correlation heatmap reveals how PM2.5 relates to temperature, wind speed, and humidity
 
-# Remove negative PM2.5 values
-df = df[df['pm25_ugm3'] >= 0]
-```
-
-Identifies and removes rows with physically impossible negative PM2.5 values.
-
-### Datetime Processing
-
-```python
-def fix_datetime(row):
-    if row['time'] == '24:00':
-        # Convert to next day at 00:00
-        new_date = pd.to_datetime(row['date'], format='%d/%m/%Y') + pd.Timedelta(days=1)
-        return new_date.strftime('%d/%m/%Y') + ' ' + '00:00'
-    return row['date'] + ' ' + row['time']
-
-# Apply the fix
-df['datetime_str'] = df.apply(fix_datetime, axis=1)
-
-# Convert to datetime
-df['datetime'] = pd.to_datetime(
-    df['datetime_str'],
-    format='%d/%m/%Y %H:%M',
-    errors='coerce'
-)
-```
-
-Handles time format issues, particularly the "24:00" time notation by converting it to "00:00" of the next day, then creates a proper datetime column.
-
-### Setting the Datetime Index
-
-```python
-# Set datetime index
-df = df.set_index('datetime')
-```
-
-Creates a datetime index for easier time series analysis.
-
-## Output
-
-The program provides:
-1. A preview of the cleaned data
-2. Data types of each column
-3. Basic descriptive statistics
-4. Counts of problematic values (negative PM2.5)
-5. Confirmation of datetime processing
-6. Final dataset size and datetime index
-
-## Notes
-
-The program detected an OLE2 inconsistency warning during Excel file reading, but this doesn't affect the data processing.
-
-## License
-
-[Your License Here]
