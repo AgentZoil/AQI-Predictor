@@ -7,18 +7,43 @@ class DataLoader:
         self.numeric_cols = ['temp_c', 'wind_speed_ms', 'pm25_ugm3', 'humidity_pct']
     
     def load_and_clean(self) -> pd.DataFrame:
-        """Steps 1-3 from your original code"""
+        """Loads data and adds required features"""
         try:
+            # 1. Load raw data
             df = pd.read_excel(self.data_path, skiprows=1, header=0)
             df.columns = ['date', 'time', 'temp_c', 'wind_speed_ms', 'pm25_ugm3', 'humidity_pct']
             df = df[df['date'] != "Date"]
+            
+            # 2. Convert numeric columns
             df[self.numeric_cols] = df[self.numeric_cols].apply(pd.to_numeric, errors='coerce')
-            df = self._handle_pm25(df)
+            
+            # 3. Handle datetime
             df = self._fix_datetime(df)
-            return df
+            
+            # 4. Handle PM2.5 values
+            df = self._handle_pm25(df)
+            
+            # 5. Add required features (NEW)
+            df = self._add_features(df)
+            
+            return df.dropna()
+            
         except Exception as e:
             raise ValueError(f"Error loading file: {e}")
 
+    def _add_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Creates all features needed for modeling"""
+        # Temporal features
+        df['hour'] = df.index.hour
+        df['day_of_week'] = df.index.dayofweek  # Monday=0, Sunday=6
+        
+        # Lag features
+        df['pm25_lag1h'] = df['pm25_ugm3'].shift(1)
+        df['pm25_24h_avg'] = df['pm25_ugm3'].rolling(24, min_periods=1).mean()
+        
+        return df
+
+    # Keep your existing methods unchanged:
     def _handle_pm25(self, df: pd.DataFrame) -> pd.DataFrame:
         """Step 2: Handle negative PM2.5 values"""
         negative_pm25 = df[df['pm25_ugm3'] < 0]
