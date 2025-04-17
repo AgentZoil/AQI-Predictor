@@ -33,15 +33,26 @@ class DataLoader:
 
     def _add_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """Creates all features needed for modeling"""
-        # Temporal features
         df['hour'] = df.index.hour
-        df['day_of_week'] = df.index.dayofweek  # Monday=0, Sunday=6
-        
+        df['day_of_week'] = df.index.dayofweek
+        df['month'] = df.index.month
+        df['day'] = df.index.day
+
         # Lag features
         df['pm25_lag1h'] = df['pm25_ugm3'].shift(1)
+        df['pm25_lag2h'] = df['pm25_ugm3'].shift(2)
+        df['pm25_lag3h'] = df['pm25_ugm3'].shift(3)
+
+        # Rolling features
         df['pm25_24h_avg'] = df['pm25_ugm3'].rolling(24, min_periods=1).mean()
-        
+        df['pm25_6h_avg'] = df['pm25_ugm3'].rolling(6, min_periods=1).mean()
+        df['pm25_6h_std'] = df['pm25_ugm3'].rolling(6, min_periods=1).std()
+
+        # Ensure these columns are available before trying to access
+        print(df.columns)
         return df
+
+
 
     # Keep your existing methods unchanged:
     def _handle_pm25(self, df: pd.DataFrame) -> pd.DataFrame:

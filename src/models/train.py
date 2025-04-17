@@ -1,70 +1,65 @@
+import xgboost as xgb
 import joblib
-import numpy as np
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import Ridge
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
 from sklearn.metrics import mean_absolute_error
+from sklearn.preprocessing import StandardScaler
 from pathlib import Path
+import numpy as np
 
 class PM25ModelTrainer:
     def __init__(self):
         self.scaler = StandardScaler()
-    
-    def prepare_data(self, df, target_col='pm25_ugm3', test_size=0.2):
-        """Prepares features and splits data"""
-        features = ['hour', 'day_of_week', 'temp_c', 'wind_speed_ms', 'pm25_24h_avg', 'pm25_lag1h']
-        X = df[features].dropna()
+        self.features = [
+            'hour', 'day_of_week', 'month', 'day',
+            'temp_c', 'wind_speed_ms', 'humidity_pct',
+            'pm25_24h_avg', 'pm25_6h_avg', 'pm25_6h_std',
+            'pm25_lag1h', 'pm25_lag2h', 'pm25_lag3h'
+        ]
+
+    def prepare_data(self, df, target_col='pm25_ugm3', test_size=0.2, val_size=0.15):
+        X = df[self.features].dropna()
         y = df[target_col].loc[X.index]
         
-        # Scale features
+        # Optional: Log-transform target
+        y = np.log1p(y)
+
         X_scaled = self.scaler.fit_transform(X)
         
-        # Time-series split (no shuffling)
-        split_idx = int(len(X) * (1 - test_size))
+        test_idx = int(len(X) * (1 - test_size))
+        val_idx = int(test_idx * (1 - val_size))
+        
         return (
-            X_scaled[:split_idx], 
-            X_scaled[split_idx:],
-            y[:split_idx],
-            y[split_idx:]
+            X_scaled[:val_idx], X_scaled[val_idx:test_idx], X_scaled[test_idx:],
+            y[:val_idx], y[val_idx:test_idx], y[test_idx:]
         )
-    
-    def train_linear_model(self, X_train, y_train):
-        """Trains a regularized linear model"""
-        model = Ridge(alpha=0.1)
-        model.fit(X_train, y_train)
-        return model
-    
-    def train_lstm_model(self, X_train, y_train):
-        """Trains an LSTM model"""
-        # Reshape for LSTM [samples, timesteps, features]
-        X_3d = X_train.reshape((X_train.shape[0], 1, X_train.shape[1]))
-        
-        model = Sequential([
-            LSTM(64, input_shape=(1, X_train.shape[1])),
-            Dense(1)
-        ])
-        model.compile(loss='mae', optimizer='adam')
-        model.fit(X_3d, y_train, epochs=20, batch_size=32, verbose=0)
-        return model
-    
-    def evaluate_model(self, model, X_test, y_test):
-        """Evaluates model performance"""
-        if 'keras' in str(type(model)):
-            X_test_3d = X_test.reshape((X_test.shape[0], 1, X_test.shape[1]))
-            y_pred = model.predict(X_test_3d).flatten()
-        else:
-            y_pred = model.predict(X_test)
-        
-        return {
-            'mae': mean_absolute_error(y_test, y_pred)
+
+    def train_xgboost_model(self, X_train, y_train, X_val=None, y_val=None):
+        params = {
+            'objective': 'reg:squarederror',
+            'n_estimators': 3000,
+            'max_depth': 8,
+            'learning_rate': 0.03,
+            'subsample': 0.9,
+            'colsample_bytree': 0.9,
+            'eval_metric': 'mae'
         }
-    
-    def save_model(self, model, model_type):
-        """Saves model to disk"""
-        Path("models").mkdir(exist_ok=True)
-        if model_type == 'linear':
-            joblib.dump(model, 'models/linear_pm25.pkl')
+
+        if X_val is not None and y_val is not None:
+            model = xgb.XGBRegressor(**params, early_stopping_rounds=100)
+            model.fit(X_train, y_train, eval_set=[(X_val, y_val)], verbose=50)
         else:
-            model.save('models/lstm_pm25.keras')
+            model = xgb.XGBRegressor(**params)
+            model.fit(X_train, y_train)
+        
+        return model
+
+    def evaluate_model(self, model, X_test, y_test):
+        y_pred = model.predict(X_test)
+        # Undo log transformation
+        y_pred = np.expm1(y_pred)
+        y_true = np.expm1(y_test)
+        return {'mae': mean_absolute_error(y_true, y_pred)}
+
+    def save_model(self, model):
+        Path("models").mkdir(exist_ok=True)
+        model.save_model('models/xgboost_pm25.json')
         joblib.dump(self.scaler, 'models/scaler.pkl')

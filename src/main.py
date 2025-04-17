@@ -5,6 +5,7 @@ from visualization.plots import AQIVisualizer
 from analysis.time_series import TimeSeriesAnalyzer
 from models.train import PM25ModelTrainer
 from models.predict import PM25Predictor
+import numpy as np
 
 def main():
     # Initialize components
@@ -22,90 +23,95 @@ def main():
     print(f"Data covers: {df.index.min()} to {df.index.max()}")
     print(f"Total entries: {len(df)}")
     print(df.describe())
+    print(df.head())  # Check if 'datetime' is being parsed correctly
+    print(df.index)  # Ensure it's a DatetimeIndex
+    print(df.columns)
+
+
     
     # Visualization pipeline
     print("\nGenerating visualizations...")
     visualizer.plot_time_series(df)
     visualizer.plot_correlation_heatmap(df)
     visualizer.plot_monthly_boxplots(df)
-    visualizer.plot_year_over_year(df)
     
     # Analysis pipeline
     print("\nPerforming time series analysis...")
     analyzer.seasonal_decomposition(df)
     
-    # ===== MODELING SECTION =====
-    print("\nStarting model training...")
+    # ===== XGBOOST MODELING SECTION =====
+    print("\nStarting XGBoost training...")
     
     # 1. Prepare data
-    X_train, X_test, y_train, y_test = model_trainer.prepare_data(df)
-    
-    # 2. Train models
-    print("\nTraining Linear Regression model...")
-    linear_model = model_trainer.train_linear_model(X_train, y_train)
-    
-    print("\nTraining LSTM model...")
-    lstm_model = model_trainer.train_lstm_model(X_train, y_train)
-    
-    # 3. Evaluate models
-    print("\nEvaluating models...")
-    linear_metrics = model_trainer.evaluate_model(linear_model, X_test, y_test)
-    lstm_metrics = model_trainer.evaluate_model(lstm_model, X_test, y_test)
-    
-    print(f"\nLinear Model MAE: {linear_metrics['mae']:.2f} µg/m³")
-    print(f"LSTM Model MAE: {lstm_metrics['mae']:.2f} µg/m³")
-    
-    # 4. Save models using .keras format (recommended)
-    model_trainer.save_model(linear_model, 'linear')  # will save as models/linear_pm25.keras
-    model_trainer.save_model(lstm_model, 'lstm')      # will save as models/lstm_pm25.keras
+    X_train, X_val, X_test, y_train, y_val, y_test = model_trainer.prepare_data(df)
 
-    # Report best model
-    if linear_metrics['mae'] < lstm_metrics['mae']:
-        print("\nBest model: Linear Regression")
-    else:
-        print("\nBest model: LSTM")
+    # 2. Train XGBoost model
+    print("\nTraining XGBoost model...")
+    xgb_model = model_trainer.train_xgboost_model(
+        X_train, y_train,
+        X_val, y_val
+    )
 
-    # 5. Plot prediction results for Linear Regression
+    # 3. Evaluate
+    xgb_metrics = model_trainer.evaluate_model(xgb_model, X_test, y_test)
+    print(f"\nXGBoost MAE: {xgb_metrics['mae']:.2f} µg/m³")
+    
+    # 4. Save model
+    model_trainer.save_model(xgb_model)
+    
+    # 5. Plot predictions
+    y_pred = xgb_model.predict(X_test)
     visualizer.plot_predictions(
         y_true=y_test,
-        y_pred=linear_model.predict(X_test),
-        model_name="Linear Regression"
+        y_pred=y_pred,
+        model_name="XGBoost"
     )
     
-    # 6. Plot prediction results for LSTM
-    # Reshape X_test for LSTM model: it should be 3D with shape (samples, time steps, features)
-    X_test_lstm = X_test.reshape(X_test.shape[0], 1, X_test.shape[1])  # Reshape to (samples, 1, features)
-    
-    visualizer.plot_predictions(
-        y_true=y_test,
-        y_pred=lstm_model.predict(X_test_lstm),
-        model_name="LSTM"
-    )
-    
-    # ===== EXAMPLE PREDICTIONS SECTION =====
+    # ===== EXAMPLE PREDICTIONS =====
     print("\nGenerating example predictions...")
-    
-    # Initialize predictor
-    predictor = PM25Predictor()  # loads models from .keras files
-    
-    # Create input: last 24 hours from test set
-    example_input = X_test[-24:].copy()
+    predictor = PM25Predictor()
+
+    # Example 1: Using the most recent data (what you already have)
     example_input = pd.DataFrame(
-        example_input,
-        columns=['hour', 'day_of_week', 'temp_c', 'wind_speed_ms', 'pm25_24h_avg', 'pm25_lag1h']
+        X_test[-24:],
+        columns=['hour', 'day_of_week', 'month', 'day', 'temp_c', 'wind_speed_ms', 
+                'humidity_pct', 'pm25_24h_avg', 'pm25_6h_avg', 'pm25_6h_std', 
+                'pm25_lag1h', 'pm25_lag2h', 'pm25_lag3h']
     )
-    
-    # Make predictions
-    linear_preds = predictor.make_predictions(example_input, model_type='linear')
-    lstm_preds = predictor.make_predictions(example_input, model_type='lstm')
-    
-    # Output comparison
-    print("\n--- Prediction Example ---")
-    print(f"Linear model predicts next PM2.5: {linear_preds[-1]:.2f} µg/m³")
-    print(f"LSTM model predicts next PM2.5: {lstm_preds[-1]:.2f} µg/m³")
-    print(f"Actual value was: {y_test.iloc[-1]:.2f} µg/m³")
-    
-    print("\nAll outputs saved to docs/images/ and models/")
+    prediction = np.expm1(predictor.make_predictions(example_input)[0])
+    print(f"\n--- Example 1: Most Recent Data ---")
+    print(f"XGBoost predicts next PM2.5: {prediction:.2f} µg/m³")
+    print(f"Actual last value was: {df['pm25_ugm3'].iloc[-1]:.2f} µg/m³")
+
+    # Add more examples from different time periods
+    # Example 2: From beginning of test set
+    early_example = pd.DataFrame(
+        X_test[:24],
+        columns=['hour', 'day_of_week', 'month', 'day', 'temp_c', 'wind_speed_ms', 
+                'humidity_pct', 'pm25_24h_avg', 'pm25_6h_avg', 'pm25_6h_std', 
+                'pm25_lag1h', 'pm25_lag2h', 'pm25_lag3h']
+    )
+    early_prediction = np.expm1(predictor.make_predictions(early_example)[0])
+    test_start_index = len(df) - len(X_test)  # Calculate where test set begins in original df
+    print(f"\n--- Example 2: Early Test Data ---")
+    print(f"Time period: {df.index[test_start_index]}")
+    print(f"XGBoost predicts PM2.5: {early_prediction:.2f} µg/m³")
+    print(f"Actual value was: {df['pm25_ugm3'].iloc[test_start_index]:.2f} µg/m³")
+
+    # Example 3: From middle of test set
+    mid_idx = len(X_test) // 2
+    mid_example = pd.DataFrame(
+        X_test[mid_idx:mid_idx+24],
+        columns=['hour', 'day_of_week', 'month', 'day', 'temp_c', 'wind_speed_ms', 
+                'humidity_pct', 'pm25_24h_avg', 'pm25_6h_avg', 'pm25_6h_std', 
+                'pm25_lag1h', 'pm25_lag2h', 'pm25_lag3h']
+    )
+    mid_prediction = np.expm1(predictor.make_predictions(mid_example)[0])
+    mid_df_idx = test_start_index + mid_idx
+    print(f"\n--- Example 3: Mid-Test Data ---")
+    print(f"Time period: {df.index[mid_df_idx]}")
+    print(f"XGBoost predicts PM2.5: {mid_prediction:.2f} µg/m³")
+    print(f"Actual value was: {df['pm25_ugm3'].iloc[mid_df_idx]:.2f} µg/m³")
 
 if __name__ == "__main__":
     main()

@@ -1,52 +1,64 @@
+import xgboost as xgb
 import joblib
 import numpy as np
 import pandas as pd
-from tensorflow.keras.models import load_model
 from pathlib import Path
 
 class PM25Predictor:
     def __init__(self):
-        # Load assets
-        self.models = {
-            'linear': self._load_model('models/linear_pm25.pkl'),
-            'lstm': self._load_model('models/lstm_pm25.keras')
-        }
-        self.scaler = joblib.load('models/scaler.pkl')
+        # Load assets - now only XGBoost
+        self.model = self._load_xgboost_model('models/xgboost_pm25.json')
+        self.scaler = joblib.load('models/scaler.pkl')  # Keep if you still want scaling
     
-    def _load_model(self, path):
-        """Handles loading different model types"""
+    def _load_xgboost_model(self, path):
+        """Loads XGBoost model from JSON"""
         if not Path(path).exists():
-            raise FileNotFoundError(f"Model file {path} not found. Train models first.")
+            raise FileNotFoundError(f"Model file {path} not found. Train model first.")
         
-        if path.endswith('.pkl'):
-            return joblib.load(path)
-        else:
-            return load_model(path)
+        model = xgb.Booster()
+        model.load_model(path)
+        return model
     
-    def make_predictions(self, new_data, model_type='linear'):
+    def make_predictions(self, new_data):
         """
         Predict PM2.5 levels from new input data.
         
         Args:
-            new_data (DataFrame): Must contain these columns:
+            new_data (DataFrame/dict): Must contain these features:
                 ['hour', 'day_of_week', 'temp_c', 'wind_speed_ms', 'pm25_24h_avg', 'pm25_lag1h']
-            model_type (str): 'linear' or 'lstm'
         
         Returns:
             numpy.ndarray: Predicted PM2.5 values
         """
+        # Handle both DataFrame and API dict input
+        if isinstance(new_data, dict):
+            input_df = pd.DataFrame([new_data])
+        else:
+            input_df = new_data.copy()
+
         # Validate input
-        required_cols = ['hour', 'day_of_week', 'temp_c', 'wind_speed_ms', 'pm25_24h_avg', 'pm25_lag1h']
-        if not all(col in new_data.columns for col in required_cols):
-            missing = [col for col in required_cols if col not in new_data.columns]
+        required_cols = [
+            'hour', 'day_of_week', 'month', 'day', 
+            'temp_c', 'wind_speed_ms', 'humidity_pct', 
+            'pm25_24h_avg', 'pm25_6h_avg', 'pm25_6h_std', 
+            'pm25_lag1h', 'pm25_lag2h', 'pm25_lag3h'
+        ]
+
+        if not all(col in input_df.columns for col in required_cols):
+            missing = [col for col in required_cols if col not in input_df.columns]
             raise ValueError(f"Missing required columns: {missing}")
         
-        # Preprocess
-        X = self.scaler.transform(new_data[required_cols])
-        
-        # Model-specific processing
-        if model_type == 'lstm':
-            X = X.reshape((X.shape[0], 1, X.shape[1]))
+        print(f"Input data columns: {input_df.columns}")
+
+        # Preprocess (XGBoost doesn't strictly need scaling, but keeping for consistency)
+        X = self.scaler.transform(input_df[required_cols])  # Scaling if needed
+        print(f"Preprocessed data (first row): {X[0]}")
+
+        # Convert to DMatrix (optimal for XGBoost)
+        dmatrix = xgb.DMatrix(X)
         
         # Predict
-        return self.models[model_type].predict(X).flatten()
+        predictions = self.model.predict(dmatrix)
+        print(f"Predictions: {predictions}")
+        
+        return predictions
