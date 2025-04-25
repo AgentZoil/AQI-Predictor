@@ -15,10 +15,17 @@ predictor = PM25Predictor()
 class PredictionRequest(BaseModel):
     hour: int
     day_of_week: int
+    month: int
+    day: int
     temp_c: float
     wind_speed_ms: float
+    humidity_pct: float
     pm25_24h_avg: float
+    pm25_6h_avg: float
+    pm25_6h_std: float
     pm25_lag1h: float
+    pm25_lag2h: float
+    pm25_lag3h: float
 
 class PredictionResponse(BaseModel):
     pm25_pred: float
@@ -34,10 +41,17 @@ async def predict(request: PredictionRequest):
     {
         "hour": 14,
         "day_of_week": 2,
+        "month": 4,
+        "day": 25,
         "temp_c": 22.5,
         "wind_speed_ms": 3.2,
+        "humidity_pct": 78.5,
         "pm25_24h_avg": 12.7,
-        "pm25_lag1h": 15.3
+        "pm25_6h_avg": 14.2,
+        "pm25_6h_std": 3.1,
+        "pm25_lag1h": 15.3,
+        "pm25_lag2h": 14.7,
+        "pm25_lag3h": 13.9
     }
     ```
     """

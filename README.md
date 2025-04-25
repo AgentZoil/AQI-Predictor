@@ -1,252 +1,227 @@
-# PM2.5 Air Quality Analysis for Wollongong (2022-2025)
+# PM2.5 Air Quality Prediction System for Wollongong
 
-![Air Quality Visualization](docs/images/pm25_time_series.png)
+![XGBoost Prediction Visualization](docs/images/predictions_xgboost.png)
 
-A comprehensive analysis pipeline for PM2.5 air quality data from Wollongong, Australia, featuring data cleaning, visualization, time series analysis, and predictive modeling.
+A complete machine learning pipeline for predicting PM2.5 levels in Wollongong, Australia using XGBoost, featuring data analysis, model training, and a production-ready API.
 
 ## Table of Contents
-- [Features](#features)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Data Structure](#data-structure)
-- [Output Visualizations](#output-visualizations)
-- [Predictive Models](#predictive-models)
-- [Key Findings](#key-findings)
+- [Key Features](#key-features)
+- [System Requirements](#system-requirements)
+- [Quick Start](#quick-start)
 - [Project Structure](#project-structure)
+- [Data Processing](#data-processing)
+- [Model Training](#model-training)
+- [API Usage](#api-usage)
+- [Example Predictions](#example-predictions)
+- [Visualizations](#visualizations)
 - [Contributing](#contributing)
-- [License](#license)
 
-## Features
+## Key Features
 
-✔ **Data Processing Pipeline**
-   - Automatic handling of invalid/negative PM2.5 values
-   - Datetime conversion and normalization
-   - Missing data detection
-   
-📊 **Advanced Visualizations**
-   - Interactive time series plots
-   - Correlation heatmaps
-   - Seasonal decomposition
-   - Comparative year-over-year analysis
-   
-🔍 **Statistical Insights**
-   - Rolling averages analysis
-   - Monthly distribution patterns
-   - Meteorological factor correlations
+🚀 **Complete ML Pipeline**
+- Data loading and cleaning
+- Feature engineering
+- Model training and evaluation
+- Production API deployment
 
-🤖 **Predictive Modeling**
-   - Linear Regression model for PM2.5 prediction
-   - LSTM neural network for time series forecasting
-   - Model evaluation and comparison
-   - Automated prediction pipeline
+📈 **Advanced XGBoost Modeling**
+- Optimized for PM2.5 prediction
+- Handles temporal dependencies
+- Feature importance analysis
 
-## Requirements
+🌐 **Ready-to-Use API**
+- FastAPI backend
+- JSON request/response format
+- Health check endpoint
+
+📊 **Comprehensive Visualizations**
+- Time series analysis
+- Model performance plots
+- Feature correlation matrices
+
+## System Requirements
 
 - Python 3.8+
-- Required packages (see `requirements.txt`):
-  ```
+- Key dependencies:
+  ```plaintext
   pandas>=1.3.0
-  matplotlib>=3.4.0
-  seaborn>=0.11.0
-  statsmodels>=0.12.0
-  numpy>=1.21.0
-  openpyxl>=3.0.0
+  xgboost>=1.6.0
+  fastapi>=0.85.0
   scikit-learn>=1.0.0
-  tensorflow>=2.9.0
-  keras>=2.9.0
+  matplotlib>=3.4.0
   ```
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/AQI-PREDICTOR.git
-   cd AQI-PREDICTOR
-   ```
+Clone the repository:
 
-2. Set up virtual environment:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # Linux/Mac
-   .venv\Scripts\activate     # Windows
-   ```
-
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## Usage
-
-Run the complete analysis pipeline:
 ```bash
-python src/main.py
+git clone https://github.com/yourusername/AQI-PREDICTOR.git
+cd AQI-PREDICTOR
 ```
 
-For specific components:
-```python
-from src.data.loader import DataLoader
-from src.visualization.plots import AQIVisualizer
-from src.models.train import PM25ModelTrainer
-from src.models.predict import PM25Predictor
+Set up environment:
 
-# Load and clean data
-loader = DataLoader("data/raw/Wollongong_09042022_10042025.xlsx")
-df = loader.load_and_clean()
-
-# Generate visualizations
-visualizer = AQIVisualizer()
-visualizer.plot_time_series(df)
-
-# Train prediction models
-trainer = PM25ModelTrainer()
-X_train, X_test, y_train, y_test = trainer.prepare_data(df)
-linear_model = trainer.train_linear_model(X_train, y_train)
-
-# Make predictions
-predictor = PM25Predictor()
-test_input = X_test[-24:].copy()
-predictions = predictor.make_predictions(test_input, model_type='linear')
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+.venv\Scripts\activate     # Windows
+pip install -r requirements.txt
 ```
 
-## Data Structure
+Run the complete pipeline:
 
-Input Excel file should contain:
+```bash
+python src/main.py  # Trains model and generates visualizations
+```
 
-| Column | Format | Description | Example |
-|--------|--------|-------------|---------|
-| date | DD/MM/YYYY | Measurement date | 09/04/2022 |
-| time | HH:MM | Measurement time | 14:00 |
-| temp_c | float | Temperature in °C | 17.8 |
-| wind_speed_ms | float | Wind speed in m/s | 1.6 |
-| pm25_ugm3 | float | PM2.5 concentration | 6.5 |
-| humidity_pct | float | Relative humidity | 70.9 |
+Start the prediction API:
 
-## Output Visualizations
-
-| Visualization | Description |
-|---------------|-------------|
-| ![Time Series](docs/images/pm25_time_series.png) | Daily and monthly PM2.5 trends over the entire period |
-| ![Feature Correlations](docs/images/feature_correlations_rolling.png) | Rolling correlations between meteorological factors and PM2.5 |
-| ![Monthly Distribution](docs/images/monthly_boxplots.png) | Statistical distribution of PM2.5 by month |
-| ![Year Comparison](docs/images/year_over_year_comparison.png) | Year-over-year comparison of PM2.5 levels |
-| ![Seasonal Decomposition (Weekly)](docs/images/seasonal_decomposition_weekly.png) | Weekly patterns in PM2.5 measurements |
-| ![Seasonal Decomposition (Annual)](docs/images/seasonal_decomposition_annual.png) | Annual cycles in PM2.5 levels |
-| ![Linear Regression Predictions](docs/images/predictions_linear_regression_last_month.png) | Linear regression model performance on the last month of data |
-| ![LSTM Predictions](docs/images/predictions_lstm_last_month.png) | LSTM neural network performance on the last month of data |
-
-## Predictive Models
-
-The project implements two types of predictive models for PM2.5 forecasting:
-
-### Linear Regression Model
-- Uses features: hour, day of week, temperature, wind speed, 24-hour average PM2.5, and 1-hour lagged PM2.5
-- Trained on historical data from 2022-2024
-- Model saved as `models/linear_pm25.pkl`
-- Performance metrics include MAE (Mean Absolute Error)
-
-### LSTM Neural Network
-- Utilizes time series patterns with the same feature set
-- Captures complex temporal dependencies
-- Trained with appropriate sequence formatting
-- Model saved as `models/lstm_pm25.keras`
-- Provides potentially more accurate predictions for longer horizons
-
-### Model Comparison
-The models are evaluated side-by-side using:
-- Mean Absolute Error (MAE)
-- Visualization of predictions against actual values
-- Example predictions on the most recent data points
-
-## Key Findings
-
-### Data Quality Issues:
-- Removed 3,146 invalid negative PM2.5 readings
-- Corrected datetime formatting for midnight values (24:00 → 00:00)
-- Identified 72 hours of missing data throughout the collection period
-
-### Seasonal Patterns:
-- Highest PM2.5 levels observed during winter months (June-August)
-- Weekly cycles show weekend vs. weekday variations with lower PM2.5 on weekends
-- Annual cycle shows clear winter peak and summer minimum
-
-### Meteorological Correlations:
-- Strong inverse relationship between PM2.5 and wind speed (r = -0.64)
-- Temperature shows moderate negative correlation during winter (r = -0.42)
-- Humidity positively correlated with PM2.5 during colder months (r = 0.38)
-
-### Predictive Modeling:
-- Linear model provides reasonable baseline performance
-- LSTM model captures more complex temporal patterns
-- Both models demonstrate strong predictive capability for short-term forecasting
-- Feature importance analysis shows wind speed and previous PM2.5 levels are the strongest predictors
+```bash
+uvicorn api.app:app --reload --port 8089
+```
 
 ## Project Structure
+
 ```
 AQI-PREDICTOR/
-├── .idea/
-├── .venv/
 ├── data/
-│   ├── output/
-│   ├── processed/
-│   └── raw/
-│       ├── Wollongong_1month.xls
-│       └── Wollongong_09042022_10042025.xlsx
-├── docs/
-│   ├── AirQuality_AI_Project_Plan.pdf
-│   └── images/
-│       ├── feature_correlations_rolling.png
-│       ├── monthly_boxplots.png
-│       ├── pm25_time_series.png
-│       ├── predictions_linear_regression_last_month.png
-│       ├── predictions_lstm_last_month.png
-│       ├── seasonal_decomposition_annual.png
-│       ├── seasonal_decomposition_weekly.png
-│       └── year_over_year_comparison.png
+│   ├── processed/       # Cleaned data files
+│   └── raw/            # Original Excel data
 ├── models/
-│   ├── linear_pm25.pkl
-│   ├── lstm_pm25.keras
-│   └── scaler.pkl
-├── notebooks/
-│   ├── EDA.ipynb
-│   └── prototyping.ipynb
+│   ├── scaler.pkl       # Feature scaler
+│   └── xgboost_pm25.json  # Trained XGBoost model
 ├── src/
-│   ├── analysis/
-│   │   ├── __init__.py
-│   │   └── time_series.py
-│   ├── api/
-│   │   └── __init__.py
-│   ├── data/
-│   │   ├── __init__.py
-│   │   └── loader.py
-│   ├── features/
-│   │   └── __init__.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── predict.py
-│   │   └── train.py
-│   ├── visualization/
-│   │   ├── __init__.py
-│   │   └── plots.py
-│   │── config.py
-│   └── main.py
-├── tests/
-├── .gitignore
-├── README.md
-├── requirements.txt
-└── test_main.http
+│   ├── analysis/        # Time series analysis
+│   ├── api/            # FastAPI application
+│   ├── data/           # Data loading
+│   ├── models/         # ML models
+│   ├── visualization/  # Plotting functions
+│   └── main.py         # Main pipeline
+├── tests/              # Test cases
+└── requirements.txt
 ```
+
+## Data Processing
+
+The system processes raw Excel data with:
+
+```python
+# From src/data/loader.py
+class DataLoader:
+    def load_and_clean(self):
+        # Handles:
+        # - Datetime conversion
+        # - Invalid value removal
+        # - Feature engineering
+        # - Missing data handling
+```
+
+Key engineered features:
+
+- Hour of day
+- Day of week
+- Rolling PM2.5 averages (6h, 24h)
+- Lagged PM2.5 values (1h, 2h, 3h)
+
+## Model Training
+
+The XGBoost model is trained with:
+
+```python
+# From src/models/train.py
+class PM25ModelTrainer:
+    def train_xgboost_model(self, X_train, y_train, X_val, y_val):
+        # Implements:
+        # - Early stopping
+        # - Hyperparameter tuning
+        # - Validation metrics
+```
+
+Model performance metrics:
+- MAE: ~2.1 µg/m³
+
+Feature importance:
+- PM2.5 24h average
+- Wind speed
+- PM2.5 1h lag
+
+## API Usage
+
+Make predictions via HTTP POST:
+
+```bash
+curl -X 'POST' \
+  'http://localhost:8089/predict' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "hour": 14,
+    "day_of_week": 2,
+    "month": 4,
+    "day": 25,
+    "temp_c": 22.5,
+    "wind_speed_ms": 3.2,
+    "humidity_pct": 78.5,
+    "pm25_24h_avg": 12.7,
+    "pm25_6h_avg": 18.2,
+    "pm25_6h_std": 3.1,
+    "pm25_lag1h": 15.3,
+    "pm25_lag2h": 14.7,
+    "pm25_lag3h": 13.9
+  }'
+```
+
+Example response:
+
+```json
+{
+  "pm25_pred": 16.28,
+  "units": "µg/m³"
+}
+```
+
+## Example Predictions
+
+From main.py:
+
+```python
+# Test predictions at different time points
+print("--- Example Predictions ---")
+print(f"Recent prediction: {prediction:.2f} µg/m³ (Actual: {actual:.2f})")
+print(f"Mid-period prediction: {mid_prediction:.2f} µg/m³")
+print(f"Early prediction: {early_prediction:.2f} µg/m³")
+```
+
+Sample output:
+
+```plaintext
+--- Example 1: Most Recent Data ---
+XGBoost predicts next PM2.5: 18.42 µg/m³
+Actual last value was: 17.85 µg/m³
+
+--- Example 2: Early Test Data ---
+XGBoost predicts PM2.5: 12.67 µg/m³
+Actual value was: 13.02 µg/m³
+```
+
+## Visualizations
+
+Generated plots include:
+
+File | Description
+---- | -----------
+time_series.png | Complete PM2.5 timeline
+monthly_boxplots.png | Monthly distribution analysis
+xgboost_predictions.png | Model predictions vs actuals
+feature_importance.png | XGBoost feature weights
 
 ## Contributing
 
-1. Fork the project
-2. Create your feature branch 
-3. Commit your changes 
-4. Push to the branch 
-5. Open a Pull Request
-testGit
+1. Fork the repository
+2. Create a feature branch (git checkout -b feature/improvement)
+3. Commit your changes (git commit -am 'Add new feature')
+4. Push to the branch (git push origin feature/improvement)
+5. Create a new Pull Request
 
 ## License
-
 ...
